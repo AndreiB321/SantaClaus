@@ -85,12 +85,19 @@ public class AnnualChange extends Entity {
         return childUpdates;
     }
 
-
+    /**
+     * return strategy
+     * @return
+     */
     public CityStrategyEnum getStrategy() {
         return strategy;
     }
 
-    public void setStrategy(CityStrategyEnum strategy) {
+    /**
+     * set strategy
+     * @param strategy
+     */
+    public void setStrategy(final CityStrategyEnum strategy) {
         this.strategy = strategy;
     }
 }

@@ -55,19 +55,19 @@ public class ChildUpdate extends Entity {
         return newGiftPreferences;
     }
 
-    public void setNewNiceScore(Double newNiceScore) {
+    public final void setNewNiceScore(final Double newNiceScore) {
         this.newNiceScore = newNiceScore;
     }
 
-    public void setNewGiftPreferences(List<Category> newGiftPreferences) {
+    public final void setNewGiftPreferences(final List<Category> newGiftPreferences) {
         this.newGiftPreferences = newGiftPreferences;
     }
 
-    public ElvesType getElf() {
+    public final  ElvesType getElf() {
         return elf;
     }
 
-    public void setElf(ElvesType elf) {
+    public final void setElf(final ElvesType elf) {
         this.elf = elf;
     }
 }

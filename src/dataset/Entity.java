@@ -1,7 +1,6 @@
 package dataset;
 
 import enums.Category;
-import enums.Cities;
 import enums.CityStrategyEnum;
 import enums.ElvesType;
 
@@ -24,16 +23,6 @@ public class Entity {
                                       final List<Category> newGiftPreferences,
                                       final ElvesType elfEntity) {
         return (ChildUpdate) this;
-    }
-    /**
-     * Populate Entity of Child
-     */
-    public Child populateEntity(final int id, final String lastName,
-                                final String firstName, final Cities city, final int age,
-                                final List<Category> giftsPreference,
-                                final List<Double> niceScore,
-                                final Double bonusNiceScoreEntity, final ElvesType elfEntity) {
-        return (Child) this;
     }
     /**
      * Populate Entity of AnnualChange

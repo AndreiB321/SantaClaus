@@ -59,8 +59,9 @@ public final class InputLoader {
         double santaBudget;
 
         try (BufferedReader bufferedReader = new BufferedReader(new FileReader(this.inputPath))) {
-
+            // get main file
             JSONObject jsonObject = (JSONObject) jsonParser.parse(bufferedReader);
+            // retrieve main data
             numberOfYears = Integer.parseInt(jsonObject.get(Constants.NUMBER_OF_YEARS).toString());
             santaBudget = Double.parseDouble(jsonObject.get(Constants.SANTA_BUDGET).toString());
             JSONObject initialData = (JSONObject) jsonObject.get(Constants.INITIAL_DATA);
@@ -69,19 +70,20 @@ public final class InputLoader {
             JSONArray jsonSantaGiftList = (JSONArray)
                     initialData.get(Constants.SANTA_GIFT_LIST);
             JSONArray jsonAnnualChanges = (JSONArray) jsonObject.get(Constants.ANNUAL_CHANGES);
+            // check if children exist
             if (jsonChildren != null) {
                 for (Object jsonChild : jsonChildren) {
-                    List<Double> niceScore = new ArrayList<>();
+                    // set niceScoreHistory as an array so we can print it later in output
+                    List<Double> niceScoreHistory = new ArrayList<>();
                     List<Category> giftPreferences = new ArrayList<>();
 
                     for (Object gift : (JSONArray) ((JSONObject) jsonChild)
                             .get(Constants.GIFTS_PREFERENCES)) {
                         giftPreferences.add(stringToCategory(gift.toString()));
                     }
-                    niceScore.add(Double.parseDouble(((JSONObject) jsonChild)
-                            .get(Constants.NICE_SCORE).toString()));
-                    Entity entity = Factory.getEntity(Constants.CHILD);
-                    children.add(entity.populateEntity(
+//                    giftPreferences.stream().distinct().collect(Collectors.toList());
+                    niceScoreHistory.add(getDouble(Constants.NICE_SCORE, jsonChild));
+                    Child.ChildBuilder childBuilder = new Child.ChildBuilder(
                             getInteger(Constants.ID, jsonChild),
                             getString(Constants.LASTNAME, jsonChild),
                             getString(Constants.FIRSTNAME, jsonChild),
@@ -89,14 +91,19 @@ public final class InputLoader {
                                     .get(Constants.CITY).toString()),
                             getInteger(Constants.AGE, jsonChild),
                             giftPreferences,
-                            niceScore,
-                            getDouble(Constants.NICE_SCORE_BONUS, jsonChild),
+                            niceScoreHistory,
                             stringToElf(((JSONObject) jsonChild)
                                     .get(Constants.ELF).toString())
-                    ));
+                    );
+                    if (((JSONObject) jsonChild).get(Constants.NICE_SCORE_BONUS) != null
+                            && getDouble(Constants.NICE_SCORE_BONUS, jsonChild) != 0.0) {
+                        childBuilder.
+                                bonusNiceScore(getDouble(Constants.NICE_SCORE_BONUS, jsonChild));
+                    }
+                    children.add(childBuilder.build());
                 }
             }
-
+            // check if gifts exist
             if (jsonSantaGiftList != null) {
                 for (Object jsonGift : jsonSantaGiftList) {
                     Entity entity = Factory.getEntity(Constants.GIFT);
@@ -110,7 +117,7 @@ public final class InputLoader {
                     ));
                 }
             }
-
+            // check if changes exist
             if (jsonAnnualChanges != null) {
                 for (Object jsonAnnualChange : jsonAnnualChanges) {
                     Double newSantaBudget =
@@ -118,7 +125,8 @@ public final class InputLoader {
                     List<Gift> newGifts = new ArrayList<>();
                     List<Child> newChildren = new ArrayList<>();
                     List<ChildUpdate> childUpdates = new ArrayList<>();
-                    CityStrategyEnum strategy = stringToCityStrategyEnum(((JSONObject) jsonAnnualChange)
+                    CityStrategyEnum strategy
+                            = stringToCityStrategyEnum(((JSONObject) jsonAnnualChange)
                             .get(Constants.STRATEGY).toString());
                     JSONArray jsonNewGifts = (JSONArray) ((JSONObject) jsonAnnualChange)
                             .get(Constants.NEW_GIFTS);
@@ -126,7 +134,7 @@ public final class InputLoader {
                             .get(Constants.NEW_CHILDREN);
                     JSONArray jsonChildrenUpdates = (JSONArray) ((JSONObject) jsonAnnualChange)
                             .get(Constants.CHILDREN_UPDATES);
-
+                    // check if gifts exist
                     if (jsonNewGifts != null) {
                         for (Object jsonNewGift : jsonNewGifts) {
                             Entity entity = Factory.getEntity(Constants.GIFT);
@@ -139,19 +147,18 @@ public final class InputLoader {
                             ));
                         }
                     }
-
+                    // check if children exist
                     if (jsonNewChildren != null) {
                         for (Object jsonNewChild : jsonNewChildren) {
-                            List<Double> niceScore = new ArrayList<>();
+                            List<Double> niceScoreHistory = new ArrayList<>();
                             List<Category> giftPreferences = new ArrayList<>();
-                            niceScore.add(getDouble(Constants.NICE_SCORE, jsonNewChild));
+                            niceScoreHistory.add(getDouble(Constants.NICE_SCORE, jsonNewChild));
 
                             for (Object gift : (JSONArray) ((JSONObject) jsonNewChild)
                                     .get(Constants.GIFTS_PREFERENCES)) {
                                 giftPreferences.add(stringToCategory(gift.toString()));
                             }
-                            Entity entity = Factory.getEntity(Constants.CHILD);
-                            newChildren.add(entity.populateEntity(
+                            Child.ChildBuilder childBuilder = new Child.ChildBuilder(
                                     getInteger(Constants.ID, jsonNewChild),
                                     getString(Constants.LASTNAME, jsonNewChild),
                                     getString(Constants.FIRSTNAME, jsonNewChild),
@@ -159,14 +166,21 @@ public final class InputLoader {
                                             .get(Constants.CITY).toString()),
                                     getInteger(Constants.AGE, jsonNewChild),
                                     giftPreferences,
-                                    niceScore,
-                                    getDouble(Constants.NICE_SCORE_BONUS, jsonNewChild),
+                                    niceScoreHistory,
                                     stringToElf(((JSONObject) jsonNewChild)
                                             .get(Constants.ELF).toString())
-                            ));
+                            );
+                            if (((JSONObject) jsonNewChild).get(Constants.NICE_SCORE_BONUS) != null
+                                    && getDouble(Constants.NICE_SCORE_BONUS, jsonNewChild) != 0.0) {
+                                childBuilder.
+                                        bonusNiceScore(getDouble(
+                                                Constants.NICE_SCORE_BONUS, jsonNewChild));
+                            }
+                            newChildren.add(childBuilder.build());
+
                         }
                     }
-
+                    // check if updates exist
                     if (jsonChildrenUpdates != null) {
                         for (Object jsonChildUpdate : jsonChildrenUpdates) {
                             Double niceScoreValue = null;
@@ -196,6 +210,7 @@ public final class InputLoader {
                 }
 
             }
+            // set database with the input retrieved
             database.setChildren(children);
             database.setGifts(gifts);
             database.setAnnualChanges(annualChanges);
@@ -206,7 +221,7 @@ public final class InputLoader {
         }
     }
 
-    private CityStrategyEnum stringToCityStrategyEnum(String strategy) {
+    private CityStrategyEnum stringToCityStrategyEnum(final String strategy) {
         return switch (strategy) {
             case "id" -> CityStrategyEnum.ID;
             case "niceScore" -> CityStrategyEnum.NICE_SCORE;
@@ -215,7 +230,7 @@ public final class InputLoader {
         };
     }
 
-    private ElvesType stringToElf(String elf) {
+    private ElvesType stringToElf(final String elf) {
         return switch (elf) {
             case "yellow" -> ElvesType.YELLOW;
             case "black" -> ElvesType.BLACK;

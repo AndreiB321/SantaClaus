@@ -15,7 +15,6 @@ public final class Factory {
         }
 
         return switch (type) {
-            case Constants.CHILD -> new Child();
             case Constants.CHILD_UPDATE -> new ChildUpdate();
             case Constants.ANNUAL_CHANGES -> new AnnualChange();
             case Constants.GIFT -> new Gift();

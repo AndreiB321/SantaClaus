@@ -2,7 +2,6 @@ package dataset;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import enums.Category;
-import enums.ElvesType;
 
 public final class Gift extends Entity {
     private String productName;
@@ -54,7 +53,7 @@ public final class Gift extends Entity {
         return quantity;
     }
 
-    public void setQuantity(int quantity) {
+    public void setQuantity(final int quantity) {
         this.quantity = quantity;
     }
 }

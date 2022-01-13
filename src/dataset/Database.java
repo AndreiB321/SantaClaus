@@ -5,14 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import common.Constants;
 import enums.Category;
 import enums.CityStrategyEnum;
+import enums.ElvesType;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import strategy.StrategySort;
 import strategy.StrategySortByID;
-import strategy.StrategySortByNicescore;
-import strategy.StrategySortByNicescoreCity;
+import strategy.StrategySortByNiceScore;
+import strategy.StrategySortByNiceScoreCity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,10 +28,10 @@ public final class Database {
     private StrategySort strategySort;
     // Created a strategy for each method
     private StrategySortByID strategySortByID = new StrategySortByID();
-    private strategy.StrategySortByNicescore StrategySortByNicescore
-            = new StrategySortByNicescore();
-    private strategy.StrategySortByNicescoreCity StrategySortByNicescoreCity
-            = new StrategySortByNicescoreCity();
+    private strategy.StrategySortByNiceScore StrategySortByNiceScore
+            = new StrategySortByNiceScore();
+    private strategy.StrategySortByNiceScoreCity StrategySortByNiceScoreCity
+            = new StrategySortByNiceScoreCity();
 
     private Database() {
     }
@@ -76,6 +77,7 @@ public final class Database {
         getChildren().forEach(child -> child.setAge(child.getAge() + 1));
 
         getChildren().removeIf(child -> child.getAge() > Constants.EIGHTEEN);
+
         // update children preferences
         for (ChildUpdate childUpdate : annualChange.getChildUpdates()) {
             // check if a child is new or updated
@@ -93,10 +95,11 @@ public final class Database {
                 // remove duplicates
                 child.setGiftsPreferences(child.getGiftsPreferences()
                         .stream().distinct().collect(Collectors.toList()));
+                child.setElf(childUpdate.getElf());
             }
         }
         // add new children
-        annualChange.getNewChildren().stream().filter(child -> child.getAge() < Constants.EIGHTEEN)
+        annualChange.getNewChildren().stream().filter(child -> child.getAge() <= Constants.EIGHTEEN)
                 .forEach(child -> getChildren().add(child));
         // add children to final json
         addChildren(objects, year);
@@ -106,13 +109,14 @@ public final class Database {
      * Set best gifts to each child
      * @return
      */
-    public JSONArray round(int year) {
+    public JSONArray round(final int year) {
         JSONArray roundList = new JSONArray();
         List<Child> childList = new ArrayList<>();
         final double[] average = {0.0};
         Gift bestGift = null;
         double bestPrice = Double.MAX_VALUE;
         // calculate average
+        setChildren(strategySortByID.sortBy(getChildren()));
         getChildren().forEach(child -> average[0] += getAverage(child));
 
         getChildren().forEach(child -> child.setAverageScore(getAverage(child)));
@@ -122,29 +126,32 @@ public final class Database {
             // sort children by strategy
             CityStrategyEnum cityStrategyEnum = getAnnualChanges().get(year).getStrategy();
 
-            if (cityStrategyEnum.equals(CityStrategyEnum.ID)) {
-                setChildren(strategySortByID.sortBy(getChildren()));
-            }
-
             if (cityStrategyEnum.equals(CityStrategyEnum.NICE_SCORE)) {
-                setChildren(StrategySortByNicescore.sortBy(getChildren()));
-            }
+                setChildren(StrategySortByNiceScore.sortBy(getChildren()));
+            } else if (cityStrategyEnum.equals(CityStrategyEnum.NICE_SCORE_CITY)) {
+                setChildren(StrategySortByNiceScoreCity.sortBy(getChildren()));
+            } else {
+                setChildren(strategySortByID.sortBy(getChildren()));
 
-            if (cityStrategyEnum.equals(CityStrategyEnum.NICE_SCORE_CITY)) {
-                setChildren(StrategySortByNicescoreCity.sortBy(getChildren()));
             }
         }
 
         for (Child child : getChildren()) {
             List<Gift> childGifts = new ArrayList<>();
+            final int thirty = 30;
+            final int hundred = 100;
 
             double averageScore = getAverage(child);
             double sumPrices = budgetUnit * averageScore;
-//            if (child.getElf().equals(ElvesType.BLACK))
-//                sumPrices = sumPrices * 0.7;
-//
-//            if (child.getElf().equals(ElvesType.PINK))
-//                sumPrices = sumPrices * 1.3;
+
+
+            if (child.getElf().equals(ElvesType.BLACK)) {
+                sumPrices -= sumPrices * thirty / hundred;
+            }
+
+            if (child.getElf().equals(ElvesType.PINK)) {
+                sumPrices += sumPrices * thirty / hundred;
+            }
 
             child.setAssignedBudget(sumPrices);
             // Find cheapest gift from preferences
@@ -168,12 +175,41 @@ public final class Database {
             // update child data
             child.setAverageScore(averageScore);
             child.setReceivedGifts(childGifts);
+
             // add object to json array
             childList.add(child);
         }
 
-        childList = strategySortByID.sortBy(childList);
 
+
+        for (Child child : getChildren()) {
+            if (child.getReceivedGifts().size() == 0 && child.getElf().equals(ElvesType.YELLOW)) {
+                List<Gift> childGifts = new ArrayList<>();
+
+                Category categoryPreference = child.getGiftsPreferences().get(0);
+                bestPrice = Double.MAX_VALUE;
+                for (Gift gift : getGifts()) {
+                    if (gift.getCategory().equals(categoryPreference)
+                            && gift.getPrice() <= bestPrice
+                            && gift.getQuantity() >= 0) {
+                        bestGift = gift;
+                        bestPrice = gift.getPrice();
+                    }
+                    if (bestPrice != Double.MAX_VALUE) {
+                        if (bestGift.getQuantity() != 0) {
+                            childGifts.add(bestGift);
+                            bestGift.setQuantity(bestGift.getQuantity() - 1);
+                            break;
+                        }
+                    }
+                }
+                child.setReceivedGifts(childGifts);
+            }
+        }
+
+
+        childList = strategySortByID.sortBy(childList);
+        childList.stream().distinct().collect(Collectors.toList());
         for (Child child : childList) {
 
             ObjectMapper objectMapper = new ObjectMapper();
@@ -196,59 +232,6 @@ public final class Database {
             roundList.add(jsonObject);
 
         }
-//
-//        for (Child child : getChildren()) {
-//            if (child.getReceivedGifts().size() == 0 && child.getElf().equals(ElvesType.YELLOW)) {
-//                System.out.println(child.getGiftsPreferences());
-//                System.out.println(child.getFirstName());
-//                System.out.println(child.getLastName());
-//                List<Gift> childGifts = new ArrayList<>();
-//
-//                double averageScore = getAverage(child);
-//                double sumPrices = 10000000.0;
-//
-//                child.setAssignedBudget(sumPrices);
-//
-//                for (Category categoryPreference : child.getGiftsPreferences()) {
-//                    bestPrice = Double.MAX_VALUE;
-//                    for (Gift gift : getGifts()) {
-//                        if (gift.getCategory().equals(categoryPreference)
-//                                && gift.getPrice() <= bestPrice
-//                                && sumPrices - gift.getPrice() >= 0 && gift.getQuantity() > 0) {
-//                            bestGift = gift;
-//                            bestPrice = gift.getPrice();
-//                        }
-//                    }
-//                    if (bestPrice != Double.MAX_VALUE) {
-//                        childGifts.add(bestGift);
-//                        sumPrices -= bestGift.getPrice();
-//                        bestGift.setQuantity(bestGift.getQuantity() - 1);
-//                    }
-//                }
-//
-//                child.setAverageScore(averageScore);
-//                child.setReceivedGifts(childGifts);
-//                // add object to json array
-//                ObjectMapper objectMapper = new ObjectMapper();
-//                String jsonStringObject = null;
-//                try {
-//                    jsonStringObject = objectMapper.writerWithDefaultPrettyPrinter()
-//                            .writeValueAsString(child);
-//                } catch (JsonProcessingException e) {
-//                    e.printStackTrace();
-//                }
-//
-//                JSONParser jsonParser = new JSONParser();
-//                JSONObject jsonObject = null;
-//                try {
-//                    jsonObject = (JSONObject) jsonParser.parse(jsonStringObject);
-//                } catch (ParseException e) {
-//                    e.printStackTrace();
-//                }
-//
-//                roundList.add(jsonObject);
-//            }
-//        }
         return roundList;
     }
 
@@ -262,6 +245,7 @@ public final class Database {
         final int twelve = 12;
         final int five = 5;
         final int ten = 10;
+        final int hundred = 100;
         // child is younger than 5
         if (child.getAge() < five) {
             return ten;
@@ -271,18 +255,20 @@ public final class Database {
             for (int i = 1; i <= child.getNiceScoreHistory().size(); i++) {
                 sum += i * child.getNiceScoreHistory().get(i - 1);
             }
-            return Math.min((sum / cnt) * (1 + child.getBonusNiceScore() / 100), 10);
+            return Math.min((sum / cnt) + (sum / cnt) * child.getBonusNiceScore() / hundred, ten);
         }
         // child is between 5 and 12
         for (Double score : child.getNiceScoreHistory()) {
             sum += score;
         }
 
-        return Math.min((sum / child.getNiceScoreHistory().size()) * (1 + child.getBonusNiceScore() / 100), 10);
+        return Math.min((sum / child.getNiceScoreHistory().size())
+                + (sum / child.getNiceScoreHistory().size())
+                * child.getBonusNiceScore() / hundred, ten);
     }
 
 
-    private void addChildren(final JSONArray objects, int year) {
+    private void addChildren(final JSONArray objects, final int year) {
         JSONObject jsonObject = new JSONObject();
         // add current round children to final array
         jsonObject.put(Constants.CHILDREN, round(year));
